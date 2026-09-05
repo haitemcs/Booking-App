@@ -19,3 +19,28 @@ class Room(models.Model):
 
     def __str__(self):
         return f"Room {self.room_number} - {self.room_type}"
+
+     
+
+
+
+
+class RoomImage(models.Model):
+    room = models.ForeignKey(Room, on_delete=models.CASCADE, related_name="images")
+    image = models.ImageField(upload_to="room_images/")
+    caption = models.CharField(max_length=255, blank=True)
+    
+
+    def __str__(self):
+        return f"Image for Room {self.room.room_number}"
+
+
+
+
+class occupancy(models.Model):
+    room = models.ForeignKey(Room, on_delete=models.CASCADE, related_name="occupancies")
+    start_date = models.DateField()
+    end_date = models.DateField()
+
+    def __str__(self):
+        return f"Occupancy for Room {self.room.room_number} from {self.start_date} to {self.end_date}"
