@@ -1,4 +1,5 @@
 from django.db import models
+from django.contrib.auth.models import User
 
 
 class Room(models.Model):
@@ -20,25 +21,19 @@ class Room(models.Model):
     def __str__(self):
         return f"Room {self.room_number} - {self.room_type}"
 
-     
-
-
-
 
 class RoomImage(models.Model):
     room = models.ForeignKey(Room, on_delete=models.CASCADE, related_name="images")
     image = models.ImageField(upload_to="room_images/")
     caption = models.CharField(max_length=255, blank=True)
-    
 
     def __str__(self):
         return f"Image for Room {self.room.room_number}"
 
 
-
-
-class occupancy(models.Model):
+class Occupancy(models.Model):
     room = models.ForeignKey(Room, on_delete=models.CASCADE, related_name="occupancies")
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="occupancies")
     start_date = models.DateField()
     end_date = models.DateField()
 
