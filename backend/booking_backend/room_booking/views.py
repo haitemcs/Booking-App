@@ -1,36 +1,46 @@
 from django.contrib.auth import authenticate
 from django.contrib.auth.models import User
+from django.db import transaction
+from rest_framework import generics, permissions, status
 from rest_framework.response import Response
-from rest_framework import generics
 from rest_framework.views import APIView
 from rest_framework.decorators import api_view
 from rest_framework.reverse import reverse
 from rest_framework.authtoken.models import Token
-from rest_framework.exceptions import PermissionDenied
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.exceptions import PermissionDenied
 
 from .models import Room, RoomImage, Occupancy
 from .serializers import RoomSerializer, RoomImageSerializer, OccupancySerializer, UserSerializer
 
 
+class IsAdminOrReadOnly(permissions.BasePermission):
+    def has_permission(self, request, view):
+        return request.method in permissions.SAFE_METHODS or bool(request.user and request.user.is_staff)
+
+
 class RoomList(generics.ListCreateAPIView):
-    queryset = Room.objects.all()
+    queryset = Room.objects.prefetch_related("images")
     serializer_class = RoomSerializer
+    permission_classes = [IsAdminOrReadOnly]
 
 
 class RoomDetail(generics.RetrieveUpdateDestroyAPIView):
-    queryset = Room.objects.all()
+    queryset = Room.objects.prefetch_related("images")
     serializer_class = RoomSerializer
+    permission_classes = [IsAdminOrReadOnly]
 
 
 class RoomImageList(generics.ListCreateAPIView):
-    queryset = RoomImage.objects.all()
+    queryset = RoomImage.objects.select_related("room")
     serializer_class = RoomImageSerializer
+    permission_classes = [IsAdminOrReadOnly]
 
 
 class RoomImageDetail(generics.RetrieveUpdateDestroyAPIView):
-    queryset = RoomImage.objects.all()
+    queryset = RoomImage.objects.select_related("room")
     serializer_class = RoomImageSerializer
+    permission_classes = [IsAdminOrReadOnly]
 
 
 class OccupancyList(generics.ListCreateAPIView):
@@ -39,18 +49,26 @@ class OccupancyList(generics.ListCreateAPIView):
 
     def get_queryset(self):
         user = self.request.user
+        qs = Occupancy.objects.select_related("room", "user").order_by("start_date")
         if user.is_superuser or user.is_staff:
-            return Occupancy.objects.all()
-        return Occupancy.objects.filter(user=user)
+            return qs
+        return qs.filter(user=user)
 
     def perform_create(self, serializer):
-        serializer.save(user=self.request.user)
+        with transaction.atomic():
+            serializer.save(user=self.request.user)
 
 
 class OccupancyDetail(generics.RetrieveUpdateDestroyAPIView):
-    queryset = Occupancy.objects.all()
     serializer_class = OccupancySerializer
     permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        qs = Occupancy.objects.select_related("room", "user")
+        if user.is_superuser or user.is_staff:
+            return qs
+        return qs.filter(user=user)
 
 
 class UserList(generics.ListAPIView):
@@ -65,62 +83,68 @@ class UserList(generics.ListAPIView):
 
 
 class UserDetail(generics.RetrieveUpdateDestroyAPIView):
-    queryset = User.objects.all()
     serializer_class = UserSerializer
     permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        if user.is_superuser or user.is_staff:
+            return User.objects.all()
+        return User.objects.filter(id=user.id)
 
     def get_object(self):
         obj = super().get_object()
         user = self.request.user
         if obj == user or user.is_staff or user.is_superuser:
             return obj
-        raise PermissionDenied("You do not have permission to view this profile.")
+        raise PermissionDenied("You do not have permission to access this profile.")
 
 
 class Register(generics.CreateAPIView):
     queryset = User.objects.all()
     serializer_class = UserSerializer
+    permission_classes = [permissions.AllowAny]
 
     def create(self, request, *args, **kwargs):
         response = super().create(request, *args, **kwargs)
-        user = User.objects.get(id=response.data['id'])
-        token, created = Token.objects.get_or_create(user=user)
+        user = User.objects.get(id=response.data["id"])
+        token, _ = Token.objects.get_or_create(user=user)
         response.data = {
-            'user': {
-                'id': user.id,
-                'username': user.username,
-                'email': user.email,
-                'first_name': user.first_name,
-                'last_name': user.last_name,
-            },
-            'token': token.key,
+            "user": {"id": user.id, "username": user.username, "email": user.email,
+                     "first_name": user.first_name, "last_name": user.last_name},
+            "token": token.key,
         }
         return response
 
 
 class Login(APIView):
+    permission_classes = [permissions.AllowAny]
+
     def post(self, request, *args, **kwargs):
-        username = request.data.get('username')
-        password = request.data.get('password')
-
+        username = request.data.get("username", "").strip()
+        password = request.data.get("password", "")
+        if not username or not password:
+            return Response({"error": "Username and password are required."}, status=status.HTTP_400_BAD_REQUEST)
         user = authenticate(request, username=username, password=password)
-
-        if user is not None:
-            token, created = Token.objects.get_or_create(user=user)
-            return Response({'token': token.key})
-        return Response({'error': 'Invalid credentials'}, status=400)
+        if user is None:
+            return Response({"error": "Invalid credentials."}, status=status.HTTP_400_BAD_REQUEST)
+        token, _ = Token.objects.get_or_create(user=user)
+        return Response({
+            "token": token.key,
+            "user": {"id": user.id, "username": user.username, "email": user.email,
+                     "first_name": user.first_name, "last_name": user.last_name},
+        })
 
 
 class Logout(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request, *args, **kwargs):
-        request.user.auth_token.delete()
-        return Response({'detail': 'Logged out.'})
+        Token.objects.filter(user=request.user).delete()
+        return Response({"detail": "Logged out."})
 
 
 @api_view(["GET"])
-
 def api_root(request, format=None):
     return Response({
         "rooms": reverse("room-list", request=request, format=format),
