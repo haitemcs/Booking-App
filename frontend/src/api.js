@@ -1,4 +1,4 @@
-const API_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000/api'
+const API_URL = import.meta.env.VITE_API_URL || '/api'
 
 async function request(path, options = {}) {
   const token = localStorage.getItem('booking_token')
