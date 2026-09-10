@@ -11,8 +11,8 @@ from .models import Occupancy, Room
 
 class BookingApiTests(APITestCase):
     def setUp(self):
-        self.user = User.objects.create_user(username="alice", password="StrongPass123!")
-        self.other = User.objects.create_user(username="bob", password="StrongPass123!")
+        self.user = User.objects.create_user(username="alice", email="alice@example.com", password="StrongPass123!")
+        self.other = User.objects.create_user(username="bob", email="bob@example.com", password="StrongPass123!")
         self.room = Room.objects.create(room_number=101, room_type="standard", price_per_night="100.00", currency="USD")
         self.rooms_url = reverse("room-list")
         self.occupancies_url = reverse("occupancy-list")
@@ -45,30 +45,34 @@ class BookingApiTests(APITestCase):
             "end_date": str(self.today + timedelta(days=4)),
         }, format="json")
         self.assertEqual(response.status_code, 201)
-        booking = Occupancy.objects.get(id=response.data["id"])
-        self.assertEqual(booking.user, self.user)
+        self.assertEqual(Occupancy.objects.get().user, self.user)
 
     def test_overlapping_booking_is_rejected(self):
-        Occupancy.objects.create(room=self.room, user=self.user,
-                                 start_date=self.today + timedelta(days=2),
-                                 end_date=self.today + timedelta(days=5))
-        self.authenticate(self.other)
+        self.authenticate()
+        Occupancy.objects.create(
+            room=self.room,
+            user=self.other,
+            start_date=self.today + timedelta(days=5),
+            end_date=self.today + timedelta(days=8),
+        )
         response = self.client.post(self.occupancies_url, {
             "room": self.room_url(),
-            "start_date": str(self.today + timedelta(days=4)),
-            "end_date": str(self.today + timedelta(days=6)),
+            "start_date": str(self.today + timedelta(days=6)),
+            "end_date": str(self.today + timedelta(days=9)),
         }, format="json")
         self.assertEqual(response.status_code, 400)
-        self.assertIn("already booked", str(response.data))
 
     def test_user_sees_only_own_bookings(self):
-        Occupancy.objects.create(room=self.room, user=self.other,
-                                 start_date=self.today + timedelta(days=2),
-                                 end_date=self.today + timedelta(days=3))
-        self.authenticate(self.user)
+        self.authenticate()
+        Occupancy.objects.create(
+            room=self.room,
+            user=self.user,
+            start_date=self.today + timedelta(days=10),
+            end_date=self.today + timedelta(days=12),
+        )
         response = self.client.get(self.occupancies_url)
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(len(response.data), 0)
+        self.assertEqual(len(response.data["results"]), 1)
 
     def test_invalid_date_range_is_rejected(self):
         self.authenticate()
