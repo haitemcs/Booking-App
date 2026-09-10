@@ -4,7 +4,7 @@ from django.db import transaction
 from rest_framework import generics, permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from rest_framework.decorators import api_view
+from rest_framework.decorators import api_view, permission_classes
 from rest_framework.reverse import reverse
 from rest_framework.authtoken.models import Token
 from rest_framework.permissions import IsAuthenticated
@@ -158,7 +158,7 @@ class Logout(APIView):
 
 
 @api_view(["GET"])
-@permissions.permission_classes([permissions.AllowAny])
+@permission_classes([permissions.AllowAny])
 def api_root(request, format=None):
     return Response({
         "rooms": reverse("room-list", request=request, format=format),
