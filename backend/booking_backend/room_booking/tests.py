@@ -85,3 +85,34 @@ class BookingApiTests(APITestCase):
         }, format="json")
         self.assertEqual(response.status_code, 201)
         self.assertTrue(response.data["token"])
+
+    def test_duplicate_email_is_rejected(self):
+        response = self.client.post(reverse("register"), {
+            "username": "another-user", "email": "ALICE@example.com", "password": "StrongPass123!"
+        }, format="json")
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("email", response.data)
+
+    def test_login_rotates_token(self):
+        first = self.client.post(reverse("login"), {
+            "username": "alice", "password": "StrongPass123!"
+        }, format="json")
+        second = self.client.post(reverse("login"), {
+            "username": "alice", "password": "StrongPass123!"
+        }, format="json")
+        self.assertEqual(first.status_code, 200)
+        self.assertEqual(second.status_code, 200)
+        self.assertNotEqual(first.data["token"], second.data["token"])
+        self.assertFalse(Token.objects.filter(key=first.data["token"]).exists())
+        self.assertTrue(Token.objects.filter(key=second.data["token"]).exists())
+
+    def test_login_is_rate_limited(self):
+        for _ in range(10):
+            response = self.client.post(reverse("login"), {
+                "username": "alice", "password": "wrong-password"
+            }, format="json")
+            self.assertEqual(response.status_code, 400)
+        response = self.client.post(reverse("login"), {
+            "username": "alice", "password": "wrong-password"
+        }, format="json")
+        self.assertEqual(response.status_code, 429)
