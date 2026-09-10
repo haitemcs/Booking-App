@@ -8,6 +8,7 @@ from rest_framework.decorators import api_view
 from rest_framework.reverse import reverse
 from rest_framework.authtoken.models import Token
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.exceptions import PermissionDenied
 
 from .models import Room, RoomImage, Occupancy
@@ -17,6 +18,10 @@ from .serializers import RoomSerializer, RoomImageSerializer, OccupancySerialize
 class IsAdminOrReadOnly(permissions.BasePermission):
     def has_permission(self, request, view):
         return request.method in permissions.SAFE_METHODS or bool(request.user and request.user.is_staff)
+
+
+class LoginRateThrottle(ScopedRateThrottle):
+    scope = "login"
 
 
 class RoomList(generics.ListCreateAPIView):
@@ -100,6 +105,13 @@ class UserDetail(generics.RetrieveUpdateDestroyAPIView):
         raise PermissionDenied("You do not have permission to access this profile.")
 
 
+def issue_token(user):
+    # Rotate the credential so a successful login invalidates any previously
+    # issued token for this account.
+    Token.objects.filter(user=user).delete()
+    return Token.objects.create(user=user)
+
+
 class Register(generics.CreateAPIView):
     queryset = User.objects.all()
     serializer_class = UserSerializer
@@ -108,7 +120,7 @@ class Register(generics.CreateAPIView):
     def create(self, request, *args, **kwargs):
         response = super().create(request, *args, **kwargs)
         user = User.objects.get(id=response.data["id"])
-        token, _ = Token.objects.get_or_create(user=user)
+        token = issue_token(user)
         response.data = {
             "user": {"id": user.id, "username": user.username, "email": user.email,
                      "first_name": user.first_name, "last_name": user.last_name},
@@ -119,6 +131,7 @@ class Register(generics.CreateAPIView):
 
 class Login(APIView):
     permission_classes = [permissions.AllowAny]
+    throttle_classes = [LoginRateThrottle]
 
     def post(self, request, *args, **kwargs):
         username = request.data.get("username", "").strip()
@@ -128,7 +141,7 @@ class Login(APIView):
         user = authenticate(request, username=username, password=password)
         if user is None:
             return Response({"error": "Invalid credentials."}, status=status.HTTP_400_BAD_REQUEST)
-        token, _ = Token.objects.get_or_create(user=user)
+        token = issue_token(user)
         return Response({
             "token": token.key,
             "user": {"id": user.id, "username": user.username, "email": user.email,
@@ -145,6 +158,7 @@ class Logout(APIView):
 
 
 @api_view(["GET"])
+@permissions.permission_classes([permissions.AllowAny])
 def api_root(request, format=None):
     return Response({
         "rooms": reverse("room-list", request=request, format=format),
