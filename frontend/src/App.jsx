@@ -168,9 +168,34 @@ function RoomDetails({ room, loggedIn, onBack, onLogin, onBooked }) {
 }
 
 function AuthModal({ mode, onClose, onSuccess, onModeChange }) {
-  const [username, setUsername] = useState(''); const [password, setPassword] = useState(''); const [email, setEmail] = useState(''); const [busy, setBusy] = useState(false); const [error, setError] = useState('')
-  async function submit(e) { e.preventDefault(); setBusy(true); setError(''); try { const result = mode === 'login' ? await api.login({ username, password }) : await api.register({ username, password, email }); onSuccess(result) } catch (err) { setError(err.message) } finally { setBusy(false) } }
-  return <div className="modal-backdrop" onClick={onClose}><div className="modal" onClick={(e) => e.stopPropagation()}><button className="modal-close" onClick={onClose}>×</button><p className="eyebrow">ACCOUNT</p><h2>{mode === 'login' ? 'Welcome back' : 'Create your account'}</h2><form onSubmit={submit}><label>Username<input required value={username} onChange={(e) => setUsername(e.target.value)} /></label>{mode === 'register' && <label>Email<input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} /></label>}<label>Password<input type="password" required value={password} onChange={(e) => setPassword(e.target.value)} /></label>{error && <p className="form-error">{error}</p>}<button className="button full" disabled={busy}>{busy ? 'Please wait…' : mode === 'login' ? 'Log in' : 'Create account'}</button></form><p className="switch-auth">{mode === 'login' ? 'New here?' : 'Already have an account?'} <button onClick={() => onModeChange(mode === 'login' ? 'register' : 'login')}>{mode === 'login' ? 'Create an account' : 'Log in'}</button></p></div></div>
+  const [username, setUsername] = useState('')
+  const [password, setPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [email, setEmail] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+
+  async function submit(e) {
+    e.preventDefault()
+    setError('')
+    if (mode === 'register' && password !== confirmPassword) {
+      setError('Passwords do not match.')
+      return
+    }
+    setBusy(true)
+    try {
+      const result = mode === 'login'
+        ? await api.login({ username, password })
+        : await api.register({ username, password, email })
+      onSuccess(result)
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return <div className="modal-backdrop" onClick={onClose}><div className="modal" onClick={(e) => e.stopPropagation()}><button className="modal-close" onClick={onClose}>×</button><p className="eyebrow">ACCOUNT</p><h2>{mode === 'login' ? 'Welcome back' : 'Create your account'}</h2><form onSubmit={submit}><label>Username<input required value={username} onChange={(e) => setUsername(e.target.value)} /></label>{mode === 'register' && <label>Email<input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} /></label>}<label>Password<input type="password" required value={password} onChange={(e) => setPassword(e.target.value)} /></label>{mode === 'register' && <label>Confirm password<input type="password" required value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} /></label>}{error && <p className="form-error">{error}</p>}<button className="button full" disabled={busy}>{busy ? 'Please wait…' : mode === 'login' ? 'Log in' : 'Create account'}</button></form><p className="switch-auth">{mode === 'login' ? 'New here?' : 'Already have an account?'} <button onClick={() => { setError(''); setConfirmPassword(''); onModeChange(mode === 'login' ? 'register' : 'login') }}>{mode === 'login' ? 'Create an account' : 'Log in'}</button></p></div></div>
 }
 
 export default App
