@@ -21,7 +21,7 @@ class IsAdminOrReadOnly(permissions.BasePermission):
 
 
 class LoginRateThrottle(ScopedRateThrottle):
-    scope = "login"
+    pass
 
 
 class RoomList(generics.ListCreateAPIView):
@@ -106,8 +106,6 @@ class UserDetail(generics.RetrieveUpdateDestroyAPIView):
 
 
 def issue_token(user):
-    # Rotate the credential so a successful login invalidates any previously
-    # issued token for this account.
     Token.objects.filter(user=user).delete()
     return Token.objects.create(user=user)
 
@@ -132,6 +130,7 @@ class Register(generics.CreateAPIView):
 class Login(APIView):
     permission_classes = [permissions.AllowAny]
     throttle_classes = [LoginRateThrottle]
+    throttle_scope = "login"
 
     def post(self, request, *args, **kwargs):
         username = request.data.get("username", "").strip()
