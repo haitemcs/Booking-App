@@ -1,75 +1,62 @@
 # Booking-App
 
-A room-booking application with a React/Vite frontend and Django REST Framework backend.
+Django REST Framework backend with a React/Vite frontend for room reservations.
 
-## Project structure
+## Stack
 
-```text
-frontend/                 React + Vite UI
-backend/booking_backend/  Django project and booking API
-```
+- Python
+- Django
+- Django REST Framework
+- PostgreSQL
+- React
+- Vite
+- GitHub Actions
 
-## Backend
+## Architecture
 
-```bash
-cd backend
-python -m venv .venv
-# activate the virtual environment
-pip install -r requirements.txt
-cp .env.example .env
-python booking_backend/manage.py migrate
-python booking_backend/manage.py runserver
-```
+    React / Vite
+         ↓
+    Django REST API
+         ↓
+    Django ORM
+         ↓
+    PostgreSQL
 
-The API is available at `http://127.0.0.1:8000/api/`.
+## Features
 
-### Authentication
+- User registration and token authentication
+- Room management and room images
+- Booking creation and management
+- Booking ownership and staff permissions
+- Booking date validation
+- Overlapping-booking prevention
+- API tests
+- Frontend production build
+- GitHub Actions CI
 
-The API uses Django users and Django REST Framework token authentication. Login and registration return a token; authenticated requests send:
+## Run backend
 
-```text
-Authorization: Token <token>
-```
+    cd backend
+    python -m venv .venv
+    pip install -r requirements.txt
+    cp .env.example .env
+    python booking_backend/manage.py migrate
+    python booking_backend/manage.py runserver
 
-`room_booking/auth_backend.py` is intentionally unused. Authentication is handled by Django's normal authentication system plus DRF `TokenAuthentication`.
+API: `http://127.0.0.1:8000/api/`
 
-### Booking rules
+## Run frontend
 
-- Check-out must be after check-in.
-- Check-in cannot be in the past.
-- Disabled rooms cannot be booked.
-- A room cannot have overlapping bookings.
-- Normal users can only see and modify their own bookings.
-- Staff users can manage rooms, images, users, and all bookings.
-- Normal users can read rooms and room images but cannot modify them.
-
-## Frontend
-
-```bash
-cd frontend
-npm install
-npm run dev
-```
-
-Vite proxies `/api` and `/media` to the Django development server by default. To point the frontend at another API, set `VITE_API_URL` in the frontend environment.
+    cd frontend
+    npm install
+    npm run dev
 
 ## Tests
 
-Backend tests:
+    python backend/booking_backend/manage.py test room_booking
+    cd frontend
+    npm run build
 
-```bash
-python backend/booking_backend/manage.py test room_booking
-```
+## Technical focus
 
-Frontend production build:
-
-```bash
-cd frontend
-npm run build
-```
-
-GitHub Actions runs Django checks/tests and the frontend build on pushes to `main` and pull requests.
-
-## Production notes
-
-Set `DJANGO_DEBUG=false`, provide a strong `DJANGO_SECRET_KEY`, configure `DJANGO_ALLOWED_HOSTS`, use a production database, and serve uploaded media/static files through a proper web server or object storage. Do not commit real environment files or secrets.
+Full-stack application practice with Django REST Framework, PostgreSQL, authentication, database validation, API testing, and a separate React frontend.
